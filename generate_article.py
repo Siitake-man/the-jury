@@ -123,10 +123,11 @@ def fetch_top_ai_news() -> dict:
   "title": "ニュースタイトル（日本語、30文字以内）",
   "title_html": "HTMLタイトル（キーワードを<span class=\\"ハイライト\\">tagで強調）",
   "hero_lead": "リード文（2。3行、HTMLの<br>タグ使用可）",
+  "overview": "ニュースの背景・詳細の説明（3〆5文、読者がニュース内容を十分に理解できるように具体的に記述）",
   "summary_items": [
-    "要経1（1。2文）",
-    "要経2（1。2文）",
-    "要経3（1。2文）"
+    "サマリ1（1。2文で要点を簡潔に）",
+    "サマリ2（1。2文で要点を簡潔に）",
+    "サマリ3（1。2文で要点を簡潔に）"
   ],
   "tags": [
     ["tag-hot", "タグ名1"],
@@ -173,7 +174,8 @@ JSON形式のみで回答：
   "title": "ニュースタイトル（日本語、30文字以内）",
   "title_html": "HTMLタイトル（キーワードを<span class=\\"ハイライト\\">tagで強調）",
   "hero_lead": "リード文（2。3行）",
-  "summary_items": ["要経1", "要経2", "要経3"],
+  "overview": "ニュースの背景・詳細の説明（3〆5文、読者が内容を十分に理解できるように具体的に）",
+  "summary_items": ["サマリ1", "サマリ2", "サマリ3"],
   "tags": [["tag-hot", "タグ名1"], ["tag-tech", "タグ名2"], ["tag-biz", "タグ名3"]],
   "news_summary_short": "Slack通知用の短い説明（50文字以内）",
   "source_name": "情報源メディア名",
@@ -344,6 +346,9 @@ def build_html(vol_num: int, news: dict, reviews: dict, roundtable: dict) -> Pat
 
     def pct(v): return int(v / 10 * 100)
 
+    # 概要テキスト
+    overview_html = news.get("overview", "")
+
     # サマリーアイテム
     summary_html = "\n      ".join(
         f"<li>{item}</li>" for item in news.get("summary_items", [])
@@ -415,6 +420,7 @@ def build_html(vol_num: int, news: dict, reviews: dict, roundtable: dict) -> Pat
         "{{REVIEW_PACKET}}": reviews["reviews"].get("packet", ""),
         "{{REVIEW_PURE}}": reviews["reviews"].get("pure", ""),
         "{{REVIEW_KITSU}}": reviews["reviews"].get("kitsu", ""),
+        "{{OVERVIEW}}": overview_html,
         "{{SUMMARY_ITEMS}}": summary_html,
         "{{CHAT_LOG_HTML}}": chat_html,
         "{{RADAR_DATA_JSON}}": json.dumps(radar_datasets, ensure_ascii=False),
