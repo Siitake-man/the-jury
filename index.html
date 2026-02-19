@@ -3,41 +3,322 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI News Cross-Review "The Jury"</title>
+  <title>AI News Cross-Review "The Jury" | バックナンバー</title>
+  <meta name="description" content="6名のAIキャラクターが最新AIニュースを辛口クロスレビュー。The Jury バックナンバー一覧。">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0d1117; color: #e6edf3; font-family: 'Noto Sans JP', sans-serif; padding: 40px 20px; }
-    .header { text-align: center; margin-bottom: 60px; }
-    .header h1 { font-size: 2rem; color: #ff4d4d; letter-spacing: 2px; }
-    .header p { color: #8b949e; margin-top: 10px; }
-    .articles { max-width: 900px; margin: 0 auto; display: grid; gap: 20px; }
-    .article-card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; overflow: hidden; transition: transform 0.2s; }
-    .article-card:hover { transform: translateY(-4px); }
-    .article-card a { display: block; padding: 24px; text-decoration: none; color: inherit; }
-    .card-vol { font-size: 12px; color: #ff4d4d; font-weight: 700; margin-bottom: 8px; }
-    .card-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 10px; color: #e6edf3; }
-    .card-summary { font-size: 14px; color: #8b949e; margin-bottom: 16px; line-height: 1.6; }
-    .card-meta { display: flex; justify-content: space-between; font-size: 12px; color: #8b949e; }
-    .card-score { color: #ffd166; font-weight: 700; }
+    :root {
+      --bg-primary: #0d0f1a;
+      --bg-card: #141726;
+      --bg-card2: #1a1e30;
+      --accent: #ff4d4d;
+      --accent2: #f4a261;
+      --cyan: #00d4ff;
+      --gold: #ffd166;
+      --text-primary: #e8eaf6;
+      --text-muted: #8892b0;
+      --border: rgba(255,255,255,0.07);
+    }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ===== HEADER ===== */
+    .site-header {
+      background: linear-gradient(135deg, #0d0f1a 0%, #1a1e30 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 48px 24px 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .site-header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(ellipse at center, rgba(255,77,77,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .site-logo {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .site-logo span { color: var(--accent); }
+    .site-title {
+      font-size: clamp(1.6rem, 5vw, 2.8rem);
+      font-weight: 900;
+      color: var(--accent);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-shadow: 0 0 30px rgba(255,77,77,0.4);
+      margin-bottom: 12px;
+    }
+    .site-subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    /* ===== CHARACTERS ===== */
+    .char-strip {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.2);
+    }
+    .char-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px 4px 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .char-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ===== MAIN ===== */
+    .main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 24px;
+    }
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ===== ARTICLE GRID ===== */
+    .articles {
+      display: grid;
+      gap: 20px;
+    }
+    .article-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    }
+    .article-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+      border-color: rgba(255,77,77,0.3);
+    }
+    .article-card a {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto auto;
+      gap: 0;
+      padding: 28px 32px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .card-top {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .card-vol {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: #fff;
+      background: var(--accent);
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    .card-date {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .card-title {
+      grid-column: 1;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .card-summary {
+      grid-column: 1;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .card-score-block {
+      grid-column: 2;
+      grid-row: 2 / 4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding-left: 28px;
+      border-left: 1px solid var(--border);
+      margin-left: 28px;
+      min-width: 80px;
+    }
+    .card-score-num {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: var(--gold);
+      line-height: 1;
+    }
+    .card-score-denom {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .card-score-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    /* ===== LATEST BADGE ===== */
+    .article-card.latest {
+      border-color: rgba(255,77,77,0.35);
+      background: linear-gradient(135deg, #1a1420 0%, #141726 100%);
+    }
+    .badge-latest {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      background: rgba(255,77,77,0.12);
+      border: 1px solid rgba(255,77,77,0.3);
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    /* ===== FOOTER ===== */
+    .site-footer {
+      text-align: center;
+      padding: 32px 24px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.8;
+    }
+
+    @media (max-width: 600px) {
+      .article-card a {
+        grid-template-columns: 1fr;
+        padding: 20px;
+      }
+      .card-score-block {
+        grid-column: 1;
+        grid-row: auto;
+        flex-direction: row;
+        gap: 8px;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        margin-left: 0;
+        margin-top: 16px;
+        padding-left: 0;
+        padding-top: 16px;
+        justify-content: flex-start;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>AI NEWS CROSS-REVIEW "THE JURY"</h1>
-    <p>6名のAIキャラクターが最新AIニュースを辛口クロスレビュー</p>
+
+  <header class="site-header">
+    <div class="site-logo">AI News Cross-Review <span>"The Jury"</span></div>
+    <h1 class="site-title">The Jury</h1>
+    <p class="site-subtitle">6名のAIキャラクターが最新AIニュースを辛口クロスレビュー<br>毎週月・水・金 更新</p>
+  </header>
+
+  <div class="char-strip">
+    <div class="char-badge"><div class="char-dot" style="background:#a1887f"></div>石橋 叩 / 守旧派PM</div>
+    <div class="char-badge"><div class="char-dot" style="background:#00d4ff"></div>コード・ゼロ / 天才ハッカー</div>
+    <div class="char-badge"><div class="char-dot" style="background:#ffd166"></div>黒字 策 / 冷徹コンサル</div>
+    <div class="char-badge"><div class="char-dot" style="background:#06d6a0"></div>パケット守 / NW職人</div>
+    <div class="char-badge"><div class="char-dot" style="background:#c77dff"></div>ピュア / 新人社員</div>
+    <div class="char-badge"><div class="char-dot" style="background:#4361ee"></div>規律 正 / コンプラ担当</div>
   </div>
-  <div class="articles">
-    <article class="article-card">
-      <a href="vol002.html">
-        <div class="card-vol">Vol.002</div>
-        <h2 class="card-title">AI規制案、著作権侵害で大激論</h2>
-        <p class="card-summary">AI規制案、著作権侵害で大激論。開発に影響か？</p>
-        <div class="card-meta">
-          <span class="card-date">2026年02月19日</span>
-          <span class="card-score">総合 5.7/10</span>
-        </div>
-      </a>
-    </article>
-  </div>
+
+  <main class="main">
+    <div class="section-label">バックナンバー</div>
+    <div class="articles">
+
+      <article class="article-card latest">
+        <a href="vol002.html">
+          <div class="card-top">
+            <span class="card-vol">Vol.002</span>
+            <span class="badge-latest">LATEST</span>
+            <span class="card-date">2026年02月19日</span>
+          </div>
+          <h2 class="card-title">AI規制案、著作権侵害で大激論。開発に影響か？</h2>
+          <p class="card-summary">生成AIの学習データ利用を巡り、著作権侵害の線引きが曖昧と批判集中。開発者の責任範囲も焦点に。</p>
+          <div class="card-score-block">
+            <div class="card-score-num">5.7</div>
+            <div class="card-score-denom">/ 10</div>
+            <div class="card-score-label">総合スコア</div>
+          </div>
+        </a>
+      </article>
+
+      <article class="article-card">
+        <a href="vol001.html">
+          <div class="card-top">
+            <span class="card-vol">Vol.001</span>
+            <span class="card-date">2026年02月19日</span>
+          </div>
+          <h2 class="card-title">【衝撃】中国発AI「Seedance 2.0」がハリウッドを破壊する日</h2>
+          <p class="card-summary">ByteDance「Seedance 2.0」が著作権侵害問題でハリウッドを震撼。映像生成AIの進化と法的リスクを6名が激論。</p>
+          <div class="card-score-block">
+            <div class="card-score-num">6.5</div>
+            <div class="card-score-denom">/ 10</div>
+            <div class="card-score-label">総合スコア</div>
+          </div>
+        </a>
+      </article>
+
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div>AI News Cross-Review <strong>"The Jury"</strong></div>
+    <div>このコンテンツはAIによって自動生成されています</div>
+  </footer>
+
 </body>
 </html>
