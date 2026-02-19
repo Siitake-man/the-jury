@@ -151,14 +151,36 @@ def generate_reviews(news: dict) -> dict:
 # ===== 座談会生成 =====
 def generate_roundtable(news: dict, reviews: dict) -> dict:
     """6名による座談会（チャット形式）と格言を生成する"""
+    # 各キャラクターのレビュー内容を座談会プロンプトに注入して姿勢の一貫性を保つ
+    char_map = {
+        "ishibashi": "石橋 叩",
+        "zero":      "コード・ゼロ",
+        "kokuji":    "黒字 策",
+        "packet":    "パケット守",
+        "pure":      "ピュア",
+        "kitsu":     "規律 正",
+    }
+    scores = reviews.get("scores", {})
+    review_texts = reviews.get("reviews", {})
+    stance_summary = ""
+    for cid, cname in char_map.items():
+        score = scores.get(cid, "?")
+        review = review_texts.get(cid, "")
+        # レビューの先頭100文字を姿勢要約として使用
+        summary = review[:100].replace('\n', '') + "…" if len(review) > 100 else review
+        stance_summary += f"- {cname}（スコア{score}/10）: {summary}\n"
+
     prompt = f"""
 あなたは「The Jury」というAIニュースレビューブログの編集AIです。
 以下のニュースについて、6名による激論座談会（チャット形式）と格言を生成してください。
 
 【ニュース】{news['title']}
 
+【各キャラクターがレビューで表明した立場（必ずこの姿勢を座談会でも一貫させること）】
+{stance_summary}
 【ルール】
 - 16ターン以上
+- 上記の各キャラクターの立場を座談会でも必ず引き継ぐこと（レビューと矛盾しない）
 - 意見の対立構造を作ること（特に「石橋 vs ゼロ」「黒字 vs 規律」）
 - 石橋（老害）の意見は一見理不尽だが現場視点では一理ある内容にすること
 - 最後はコンサル（黒字）かハッカー（ゼロ）が未来への示唆で強引に締めること
