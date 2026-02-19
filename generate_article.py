@@ -329,17 +329,22 @@ def update_index(vol_num: int, news: dict, total_score: float):
     vol_str = f"Vol.{vol_num:03d}"
     article_id = f"vol{vol_num:03d}"
 
-    new_entry = f"""    <article class="article-card">
-      <a href="{article_id}.html">
-        <div class="card-vol">{vol_str}</div>
-        <h2 class="card-title">{news['title']}</h2>
-        <p class="card-summary">{news.get('news_summary_short', '')}</p>
-        <div class="card-meta">
-          <span class="card-date">{today}</span>
-          <span class="card-score">総合 {total_score}/10</span>
-        </div>
-      </a>
-    </article>"""
+    new_entry = f"""      <article class="article-card latest">
+        <a href="{article_id}.html">
+          <div class="card-top">
+            <span class="card-vol">{vol_str}</span>
+            <span class="badge-latest">LATEST</span>
+            <span class="card-date">{today}</span>
+          </div>
+          <h2 class="card-title">{news['title']}</h2>
+          <p class="card-summary">{news.get('news_summary_short', '')}</p>
+          <div class="card-score-block">
+            <div class="card-score-num">{total_score}</div>
+            <div class="card-score-denom">/ 10</div>
+            <div class="card-score-label">総合スコア</div>
+          </div>
+        </a>
+      </article>"""
 
     if not index_path.exists():
         # index.htmlが存在しない場合は新規作成
@@ -380,6 +385,10 @@ def update_index(vol_num: int, news: dict, total_score: float):
     else:
         # 既存のindex.htmlに記事を追加（最新が上に来るよう先頭に挿入）
         content = index_path.read_text(encoding="utf-8")
+        # 既存のlatestバッジを履歴カードに変更（新しい記事が最新になるため）
+        content = content.replace('article-card latest', 'article-card')
+        content = content.replace('<span class="badge-latest">LATEST</span>', '')
+        # 新しい記事を先頭に挿入
         content = content.replace(
             '<div class="articles">',
             f'<div class="articles">\n{new_entry}'
