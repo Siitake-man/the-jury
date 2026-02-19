@@ -9,6 +9,12 @@ import re
 import sys
 import base64
 import datetime
+import time
+import urllib.request
+import urllib.parse
+import urllib.error
+import xml.etree.ElementTree as ET
+import html as html_module
 from pathlib import Path
 
 # ===== 設定 =====
@@ -41,45 +47,147 @@ def call_gemini(prompt: str, model: str = "gemini-2.0-flash") -> str:
         print(f"❌ Gemini API エラー: {e.code} {e.read().decode()}")
         sys.exit(1)
 
-# ===== ニュース検索（Gemini Grounding） =====
+# ===== 使用済みニュースの重複チェック =====
+def load_used_news() -> list:
+    """過去に使用したニュースタイトルのリストを読み込む"""
+    used_file = Path(__file__).parent / "used_news.json"
+    if used_file.exists():
+        return json.loads(used_file.read_text(encoding="utf-8"))
+    return []
+
+def save_used_news(used: list, title: str):
+    """使用したニュースタイトルを記録する（50件まで保持）"""
+    used_file = Path(__file__).parent / "used_news.json"
+    used.append(title)
+    used_file.write_text(json.dumps(used[-50:], ensure_ascii=False, indent=2), encoding="utf-8")
+
+# ===== Google News RSS取得 =====
+def fetch_rss_candidates() -> list:
+    """Google News RSSからAI関連ニュースを取得する"""
+    query = urllib.parse.quote("AI 人工知能 生成AI LLM")
+    url = f"https://news.google.com/rss/search?q={query}&hl=ja&gl=JP&ceid=JP:ja"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            content = resp.read()
+        root = ET.fromstring(content)
+        items = root.findall(".//item")
+        candidates = []
+        for item in items[:20]:  # 上位20件を候補に
+            title = html_module.unescape(item.findtext("title", ""))
+            link = item.findtext("link", "")
+            pub = item.findtext("pubDate", "")
+            source_el = item.find("source")
+            source = source_el.text if source_el is not None else "不明"
+            source_url = source_el.get("url", "") if source_el is not None else ""
+            candidates.append({
+                "title": title,
+                "link": link,
+                "pub": pub,
+                "source": source,
+                "source_url": source_url,
+            })
+        print(f"✅ Google News RSS取得完了: {len(candidates)}件")
+        return candidates
+    except Exception as e:
+        print(f"⚠️ RSS取得失敗（Geminiフォールバックに切り替え）: {e}")
+        return []
+
+# ===== ニュース選抜（RSS + Gemini） =====
 def fetch_top_ai_news() -> dict:
-    """Geminiにニュース検索をさせて、今日のホットなAIトピックを取得する"""
+    """グーグルニュースRSSから候補を取得し、Geminiが最適な1件を選抜して記事内容を生成する"""
     today = datetime.date.today().strftime("%Y年%m月%d日")
-    prompt = f"""
-今日（{today}）時点で最もホットなAI関連ニュースを1件選んでください。
+    used_titles = load_used_news()
 
-条件：
-- 直近1週間以内のニュース
-- 日本のエンジニア・PMが関心を持つ話題（LLM、生成AI、AI規制、AI×ビジネス等）
-- 議論を呼ぶ、賛否が分かれるトピックが望ましい
+    # RSSから候補取得
+    candidates = fetch_rss_candidates()
 
-以下のJSON形式のみで回答してください（余計なテキスト不要）：
+    # 重複除去
+    candidates = [c for c in candidates if c["title"] not in used_titles]
+
+    if candidates:
+        # RSS候補をGeminiに渡して最適な1件を選抜させる
+        candidate_list = "\n".join(
+            [f"{i+1}. [{c['source']}] {c['title']} ({c['pub'][:16]})" for i, c in enumerate(candidates[:15])]
+        )
+        prompt = f"""
+以下は今日（{today}）のAI関連ニュース一覧です。
+日本のエンジニア・パーソンマネージャーが最も議論したくなる、賛否が分かれるトピックを1件選んで、記事内容を生成してください。
+
+候補ニュース：
+{candidate_list}
+
+選抜したニュースの番号（selected_index）と記事内容を以下のJSON形式のみで回答：
 {{
+  "selected_index": 1,
   "title": "ニュースタイトル（日本語、30文字以内）",
-  "title_html": "HTMLタイトル（キーワードを<span class=\\"highlight\\">タグで強調）",
-  "hero_lead": "リード文（2〜3行、HTMLの<br>タグ使用可）",
+  "title_html": "HTMLタイトル（キーワードを<span class=\\"ハイライト\\">tagで強調）",
+  "hero_lead": "リード文（2。3行、HTMLの<br>タグ使用可）",
   "summary_items": [
-    "要約1（1〜2文）",
-    "要約2（1〜2文）",
-    "要約3（1〜2文）"
+    "要経1（1。2文）",
+    "要経2（1。2文）",
+    "要経3（1。2文）"
   ],
   "tags": [
     ["tag-hot", "タグ名1"],
     ["tag-tech", "タグ名2"],
     ["tag-biz", "タグ名3"]
   ],
+  "news_summary_short": "Slack通知用の短い説明（50文字以内）"
+}}
+"""
+        raw = call_gemini(prompt)
+        match = re.search(r'\{{[\s\S]*\}}', raw)
+        if not match:
+            print("❌ ニュース選抜失敗。レスポンス:", raw[:500])
+            sys.exit(1)
+        result = json.loads(match.group())
+
+        # 選抜された候補のソース情報をマージ
+        idx = result.get("selected_index", 1) - 1
+        if 0 <= idx < len(candidates):
+            selected = candidates[idx]
+            result["source_name"] = selected["source"]
+            result["source_url"] = selected["link"]
+        else:
+            result["source_name"] = candidates[0]["source"]
+            result["source_url"] = candidates[0]["link"]
+
+        # 使用済みに記録
+        save_used_news(used_titles, result["title"])
+        return result
+
+    else:
+        # RSSが使えない場合はGemini単独で生成（フォールバック）
+        print("⚠️ RSS候補なし。Gemini単独でニュース生成。")
+        used_str = "\n".join([f"- {t}" for t in used_titles[-10:]]) if used_titles else "なし"
+        prompt = f"""
+今日（{today}）時点で最もホットなAI関連ニュースを1件選んでください。
+条件：直近1週間以内、日本のエンジニア・パーソンマネージャーが関心を持つ話題、議論を呼ぶトピック。
+
+下記は過去に使用済みなので選ばないでください：
+{used_str}
+
+JSON形式のみで回答：
+{{
+  "title": "ニュースタイトル（日本語、30文字以内）",
+  "title_html": "HTMLタイトル（キーワードを<span class=\\"ハイライト\\">tagで強調）",
+  "hero_lead": "リード文（2。3行）",
+  "summary_items": ["要経1", "要経2", "要経3"],
+  "tags": [["tag-hot", "タグ名1"], ["tag-tech", "タグ名2"], ["tag-biz", "タグ名3"]],
   "news_summary_short": "Slack通知用の短い説明（50文字以内）",
   "source_name": "情報源メディア名",
   "source_url": "情報源URL"
 }}
 """
-    raw = call_gemini(prompt)
-    # JSONブロックを抽出
-    match = re.search(r'\{[\s\S]*\}', raw)
-    if not match:
-        print("❌ ニュース取得失敗。レスポンス:", raw[:500])
-        sys.exit(1)
-    return json.loads(match.group())
+        raw = call_gemini(prompt)
+        match = re.search(r'\{{[\s\S]*\}}', raw)
+        if not match:
+            print("❌ ニュース取得失敗。レスポンス:", raw[:500])
+            sys.exit(1)
+        result = json.loads(match.group())
+        save_used_news(used_titles, result["title"])
+        return result
 
 # ===== クロスレビュー生成 =====
 def generate_reviews(news: dict) -> dict:
@@ -275,6 +383,7 @@ def build_html(vol_num: int, news: dict, reviews: dict, roundtable: dict) -> Pat
 
     # ソースリンク
     source_links = f'<a href="{news.get("source_url", "#")}" target="_blank" rel="noopener">{news.get("source_name", "参考記事")}</a>'
+    source_badge = f'<a href="{news.get("source_url", "#")}" target="_blank" rel="noopener">{news.get("source_name", "参考記事")}</a>'
 
     # テンプレート置換
     html = template
@@ -311,6 +420,7 @@ def build_html(vol_num: int, news: dict, reviews: dict, roundtable: dict) -> Pat
         "{{RADAR_DATA_JSON}}": json.dumps(radar_datasets, ensure_ascii=False),
         "{{QUOTE_TEXT}}": roundtable.get("quote", ""),
         "{{SOURCE_LINKS}}": source_links,
+        "{{SOURCE_BADGE}}": source_badge,
         "{{SUPABASE_URL}}": SUPABASE_URL,
         "{{SUPABASE_ANON_KEY}}": SUPABASE_ANON_KEY,
     }
