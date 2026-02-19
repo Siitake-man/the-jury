@@ -101,15 +101,15 @@ def generate_reviews(news: dict) -> dict:
 6. 規律 正（きりつ ただし）: コンプラ担当/40代。法的リスクに敏感。「著作権」「情報漏洩」「GDPR/AI Act」。
 
 【出力形式】
-以下のJSON形式のみで回答してください：
+以下のJSON形式のみで回答してください（radarは不要、scoresとreviewsのみ）：
 {{
   "scores": {{
-    "ishibashi": 点数(1-10),
-    "zero": 点数(1-10),
-    "kokuji": 点数(1-10),
-    "packet": 点数(1-10),
-    "pure": 点数(1-10),
-    "kitsu": 点数(1-10)
+    "ishibashi": 点数(1-10の整数),
+    "zero": 点数(1-10の整数),
+    "kokuji": 点数(1-10の整数),
+    "packet": 点数(1-10の整数),
+    "pure": 点数(1-10の整数),
+    "kitsu": 点数(1-10の整数)
   }},
   "reviews": {{
     "ishibashi": "石橋のレビュー（350〜400文字、口語体、辛口）",
@@ -118,15 +118,7 @@ def generate_reviews(news: dict) -> dict:
     "packet": "パケットのレビュー（350〜400文字、口語体、インフラ視点）",
     "pure": "ピュアのレビュー（350〜400文字、口語体、素朴な疑問）",
     "kitsu": "規律のレビュー（350〜400文字、口語体、法的視点）"
-  }},
-  "radar": [
-    {{"name": "石橋 叩", "color": "#a1887f", "data": [技術革新性,ビジネス影響,リスク度,社会的影響,現場実用性,倫理法的問題]}},
-    {{"name": "コード・ゼロ", "color": "#00d4ff", "data": [技術革新性,ビジネス影響,リスク度,社会的影響,現場実用性,倫理法的問題]}},
-    {{"name": "黒字 策", "color": "#ffd166", "data": [技術革新性,ビジネス影響,リスク度,社会的影響,現場実用性,倫理法的問題]}},
-    {{"name": "パケット守", "color": "#06d6a0", "data": [技術革新性,ビジネス影響,リスク度,社会的影響,現場実用性,倫理法的問題]}},
-    {{"name": "ピュア", "color": "#c77dff", "data": [技術革新性,ビジネス影響,リスク度,社会的影響,現場実用性,倫理法的問題]}},
-    {{"name": "規律 正", "color": "#4361ee", "data": [技術革新性,ビジネス影響,リスク度,社会的影響,現場実用性,倫理法的問題]}}
-  ]
+  }}
 }}
 """
     raw = call_gemini(prompt)
@@ -134,7 +126,27 @@ def generate_reviews(news: dict) -> dict:
     if not match:
         print("❌ レビュー生成失敗。レスポンス:", raw[:500])
         sys.exit(1)
-    return json.loads(match.group())
+    result = json.loads(match.group())
+
+    # radarデータはスコアから自動生成（APIに頼らず確実に生成）
+    scores = result.get("scores", {})
+    char_configs = [
+        # (id, name, color, [技術革新性係数, ビジネス影響係数, リスク度係数, 社会的影響係数, 現場実用性係数, 倫理法的問題係数])
+        # 各キャラクターの視点に応じた係数でスコアを変換
+        ("ishibashi", "石橋 叩",   "#a1887f", [0.6, 0.8, 1.2, 0.9, 1.1, 0.8]),
+        ("zero",      "コード・ゼロ", "#00d4ff", [1.3, 0.9, 0.7, 0.8, 1.1, 0.6]),
+        ("kokuji",    "黒字 策",    "#ffd166", [0.8, 1.3, 0.9, 0.9, 0.9, 0.7]),
+        ("packet",    "パケット守",  "#06d6a0", [1.0, 0.7, 1.1, 0.8, 1.3, 0.9]),
+        ("pure",      "ピュア",     "#c77dff", [1.0, 1.0, 1.0, 1.1, 1.0, 0.9]),
+        ("kitsu",     "規律 正",    "#4361ee", [0.7, 0.8, 1.3, 1.0, 0.8, 1.4]),
+    ]
+    radar = []
+    for cid, cname, color, factors in char_configs:
+        base = scores.get(cid, 5)
+        data = [min(10, max(1, round(base * f))) for f in factors]
+        radar.append({"name": cname, "color": color, "data": data})
+    result["radar"] = radar
+    return result
 
 # ===== 座談会生成 =====
 def generate_roundtable(news: dict, reviews: dict) -> dict:
