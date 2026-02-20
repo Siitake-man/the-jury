@@ -122,12 +122,11 @@ def fetch_top_ai_news() -> dict:
   "selected_index": 1,
   "title": "ニュースタイトル（日本語、30文字以内）",
   "title_html": "HTMLタイトル（キーワードを<span class=\\"ハイライト\\">tagで強調）",
-  "hero_lead": "リード文（2。3行、HTMLの<br>タグ使用可）",
-  "overview": "ニュースの背景・詳細の説明（3〆5文、読者がニュース内容を十分に理解できるように具体的に記述）",
+  "hero_lead": "リード文（2〜3行、HTMLの<br>タグ使用可）",
   "summary_items": [
-    "サマリ1（1。2文で要点を簡潔に）",
-    "サマリ2（1。2文で要点を簡潔に）",
-    "サマリ3（1。2文で要点を簡潔に）"
+    "サマリ1（1〜2文で要点を簡潔に）",
+    "サマリ2（1〜2文で要点を簡潔に）",
+    "サマリ3（1〜2文で要点を簡潔に）"
   ],
   "tags": [
     ["tag-hot", "タグ名1"],
@@ -146,6 +145,11 @@ def fetch_top_ai_news() -> dict:
             print("❌ ニュース選抜失敗。レスポンス:", raw[:500])
             sys.exit(1)
         result = json.loads(match.group())
+
+        # overviewを別途生成（トークン節約のため分離）
+        selected_title = result.get("title", "")
+        overview_prompt = f"""以下のAIニュースについて、読者が内容を十分に理解できるよう背景・詳細を3〜5文で日本語で説明してください。説明文のみを返してください（JSONは不要）。\n\nニュース：{selected_title}"""
+        result["overview"] = call_gemini(overview_prompt).strip()
 
         # 選抜された候補のソース情報をマージ
         idx = result.get("selected_index", 1) - 1
@@ -176,8 +180,7 @@ JSON形式のみで回答：
 {{
   "title": "ニュースタイトル（日本語、30文字以内）",
   "title_html": "HTMLタイトル（キーワードを<span class=\\"ハイライト\\">tagで強調）",
-  "hero_lead": "リード文（2。3行）",
-  "overview": "ニュースの背景・詳細の説明（3〆5文、読者が内容を十分に理解できるように具体的に）",
+  "hero_lead": "リード文（2〜3行）",
   "summary_items": ["サマリ1", "サマリ2", "サマリ3"],
   "tags": [["tag-hot", "タグ名1"], ["tag-tech", "タグ名2"], ["tag-biz", "タグ名3"]],
   "news_summary_short": "Slack通知用の短い説明（50文字以内）",
@@ -194,6 +197,10 @@ JSON形式のみで回答：
             print("❌ ニュース取得失敗。レスポンス:", raw[:500])
             sys.exit(1)
         result = json.loads(match.group())
+        # overviewを別途生成（トークン節約のため分離）
+        selected_title = result.get("title", "")
+        overview_prompt = f"""以下のAIニュースについて、読者が内容を十分に理解できるよう背景・詳細を3〜5文で日本語で説明してください。説明文のみを返してください（JSONは不要）。\n\nニュース：{selected_title}"""
+        result["overview"] = call_gemini(overview_prompt).strip()
         save_used_news(used_titles, result["title"])
         return result
 
