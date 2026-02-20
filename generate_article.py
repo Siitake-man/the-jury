@@ -26,9 +26,6 @@ SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 # ===== Gemini API呼び出し =====
 def call_gemini(prompt: str, model: str = "gemini-2.0-flash") -> str:
     """Gemini APIを呼び出してテキストを生成する"""
-    import urllib.request
-    import urllib.error
-
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -45,6 +42,31 @@ def call_gemini(prompt: str, model: str = "gemini-2.0-flash") -> str:
             return result["candidates"][0]["content"]["parts"][0]["text"]
     except urllib.error.HTTPError as e:
         print(f"❌ Gemini API エラー: {e.code} {e.read().decode()}")
+        sys.exit(1)
+
+def call_gemini_json(prompt: str, model: str = "gemini-2.0-flash") -> dict:
+    """Gemini APIをJSON出力モードで呼び出す（途中切れ防止）"""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.85,
+            "maxOutputTokens": 8192,
+            "response_mime_type": "application/json",
+        }
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            text = result["candidates"][0]["content"]["parts"][0]["text"]
+            return json.loads(text)
+    except urllib.error.HTTPError as e:
+        print(f"❌ Gemini API エラー: {e.code} {e.read().decode()}")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"❌ JSON解析エラー: {e}")
         sys.exit(1)
 
 # ===== 使用済みニュースの重複チェック =====
@@ -136,15 +158,7 @@ def fetch_top_ai_news() -> dict:
   "news_summary_short": "Slack通知用の短い説明（50文字以内）"
 }}
 """
-        raw = call_gemini(prompt)
-        # コードブロック（```json ... ```）にも対応
-        raw_clean = re.sub(r'^```[\w]*\n?', '', raw.strip(), flags=re.MULTILINE)
-        raw_clean = re.sub(r'```$', '', raw_clean.strip())
-        match = re.search(r'\{{[\s\S]*\}}', raw_clean)
-        if not match:
-            print("❌ ニュース選抜失敗。レスポンス:", raw[:500])
-            sys.exit(1)
-        result = json.loads(match.group())
+        result = call_gemini_json(prompt)
 
         # overviewを別途生成（トークン節約のため分離）
         selected_title = result.get("title", "")
@@ -188,15 +202,7 @@ JSON形式のみで回答：
   "source_url": "情報源URL"
 }}
 """
-        raw = call_gemini(prompt)
-        # コードブロック（```json ... ```）にも対応
-        raw_clean = re.sub(r'^```[\w]*\n?', '', raw.strip(), flags=re.MULTILINE)
-        raw_clean = re.sub(r'```$', '', raw_clean.strip())
-        match = re.search(r'\{{[\s\S]*\}}', raw_clean)
-        if not match:
-            print("❌ ニュース取得失敗。レスポンス:", raw[:500])
-            sys.exit(1)
-        result = json.loads(match.group())
+        result = call_gemini_json(prompt)
         # overviewを別途生成（トークン節約のため分離）
         selected_title = result.get("title", "")
         overview_prompt = f"""以下のAIニュースについて、読者が内容を十分に理解できるよう背景・詳細を3〜5文で日本語で説明してください。説明文のみを返してください（JSONは不要）。\n\nニュース：{selected_title}"""
@@ -244,15 +250,7 @@ def generate_reviews(news: dict) -> dict:
   }}
 }}
 """
-    raw = call_gemini(prompt)
-    # コードブロック（```json ... ```）にも対応
-    raw_clean = re.sub(r'^```[\w]*\n?', '', raw.strip(), flags=re.MULTILINE)
-    raw_clean = re.sub(r'```$', '', raw_clean.strip())
-    match = re.search(r'\{[\s\S]*\}', raw_clean)
-    if not match:
-        print("❌ レビュー生成失敗。レスポンス:", raw[:500])
-        sys.exit(1)
-    result = json.loads(match.group())
+    result = call_gemini_json(prompt)
 
     # radarデータはスコアから自動生成（APIに頼らず確実に生成）
     scores = result.get("scores", {})
@@ -325,15 +323,7 @@ def generate_roundtable(news: dict, reviews: dict) -> dict:
 
 ※ leftは左寄り（石橋・パケット・規律）、rightは右寄り（ゼロ・黒字・ピュア）
 """
-    raw = call_gemini(prompt)
-    # コードブロック（```json ... ```）にも対応
-    raw_clean = re.sub(r'^```[\w]*\n?', '', raw.strip(), flags=re.MULTILINE)
-    raw_clean = re.sub(r'```$', '', raw_clean.strip())
-    match = re.search(r'\{[\s\S]*\}', raw_clean)
-    if not match:
-        print("❌ 座談会生成失敗。レスポンス:", raw[:500])
-        sys.exit(1)
-    return json.loads(match.group())
+    return call_gemini_json(prompt)
 
 # ===== HTMLビルド =====
 def build_html(vol_num: int, news: dict, reviews: dict, roundtable: dict) -> Path:
