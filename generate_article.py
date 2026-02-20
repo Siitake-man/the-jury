@@ -138,7 +138,10 @@ def fetch_top_ai_news() -> dict:
 }}
 """
         raw = call_gemini(prompt)
-        match = re.search(r'\{{[\s\S]*\}}', raw)
+        # コードブロック（```json ... ```）にも対応
+        raw_clean = re.sub(r'^```[\w]*\n?', '', raw.strip(), flags=re.MULTILINE)
+        raw_clean = re.sub(r'```$', '', raw_clean.strip())
+        match = re.search(r'\{{[\s\S]*\}}', raw_clean)
         if not match:
             print("❌ ニュース選抜失敗。レスポンス:", raw[:500])
             sys.exit(1)
@@ -183,7 +186,10 @@ JSON形式のみで回答：
 }}
 """
         raw = call_gemini(prompt)
-        match = re.search(r'\{{[\s\S]*\}}', raw)
+        # コードブロック（```json ... ```）にも対応
+        raw_clean = re.sub(r'^```[\w]*\n?', '', raw.strip(), flags=re.MULTILINE)
+        raw_clean = re.sub(r'```$', '', raw_clean.strip())
+        match = re.search(r'\{{[\s\S]*\}}', raw_clean)
         if not match:
             print("❌ ニュース取得失敗。レスポンス:", raw[:500])
             sys.exit(1)
@@ -232,7 +238,10 @@ def generate_reviews(news: dict) -> dict:
 }}
 """
     raw = call_gemini(prompt)
-    match = re.search(r'\{[\s\S]*\}', raw)
+    # コードブロック（```json ... ```）にも対応
+    raw_clean = re.sub(r'^```[\w]*\n?', '', raw.strip(), flags=re.MULTILINE)
+    raw_clean = re.sub(r'```$', '', raw_clean.strip())
+    match = re.search(r'\{[\s\S]*\}', raw_clean)
     if not match:
         print("❌ レビュー生成失敗。レスポンス:", raw[:500])
         sys.exit(1)
@@ -310,7 +319,10 @@ def generate_roundtable(news: dict, reviews: dict) -> dict:
 ※ leftは左寄り（石橋・パケット・規律）、rightは右寄り（ゼロ・黒字・ピュア）
 """
     raw = call_gemini(prompt)
-    match = re.search(r'\{[\s\S]*\}', raw)
+    # コードブロック（```json ... ```）にも対応
+    raw_clean = re.sub(r'^```[\w]*\n?', '', raw.strip(), flags=re.MULTILINE)
+    raw_clean = re.sub(r'```$', '', raw_clean.strip())
+    match = re.search(r'\{[\s\S]*\}', raw_clean)
     if not match:
         print("❌ 座談会生成失敗。レスポンス:", raw[:500])
         sys.exit(1)
